@@ -1,37 +1,48 @@
 import typer
-import requests
-import csv
-from typing import Optional
+from fetch_papers.pubmed_fetcher import PubMedClient, filter_papers, save_to_csv
 
 app = typer.Typer()
 
 @app.command()
 def get_papers_list(
-    query: str,
-    file: Optional[str] = typer.Option(None, "--file", "-f", help="File name to save results"),
-    debug: bool = typer.Option(False, "--debug", "-d", help="Print debug information")
+    query: str = typer.Argument(..., help="Search query for PubMed"),
+    file: str = typer.Option(None, "-f", "--file", help="Filename to save the results (optional)"),
+    debug: bool = typer.Option(False, "--debug", help="Print debug information"),
 ):
-    # Debugging output
+    """
+    Fetch a list of papers from PubMed based on the query and optionally save to a file.
+    """
+    client = PubMedClient()  # Initialize the PubMed client
+
     if debug:
-        typer.echo(f"Query: {query}")
-        typer.echo(f"Output file: {file}")
+        typer.echo(f"Fetching papers for query: {query}")
 
-    # Fetch papers (this is a simplified example, you'll use the PubMed API here)
-    papers = [
-        {"PubmedID": "12345", "Title": "Pharmaceutical Research 101", "Publication Date": "2023-01-01", "Non-academic Author(s)": "Dr. John Doe", "Company Aliation(s)": "PharmaCo", "Corresponding Author Email": "john.doe@pharmaco.com"},
-        {"PubmedID": "67890", "Title": "Biotech Advances in 2023", "Publication Date": "2023-05-15", "Non-academic Author(s)": "Dr. Jane Smith", "Company Aliation(s)": "BioTechCorp", "Corresponding Author Email": "jane.smith@biotechcorp.com"}
-    ]
+    try:
+        # Step 1: Fetch paper IDs
+        paper_ids = client.fetch_paper_ids(query)
+        if debug:
+            typer.echo(f"Fetched Paper IDs: {paper_ids}")
 
-    # Output to CSV or console
-    if file:
-        with open(file, mode="w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=papers[0].keys())
-            writer.writeheader()
-            writer.writerows(papers)
-        typer.echo(f"Results saved to {file}")
-    else:
-        for paper in papers:
-            typer.echo(f"PubmedID: {paper['PubmedID']}, Title: {paper['Title']}, Publication Date: {paper['Publication Date']}")
+        # Step 2: Fetch paper details
+        paper_details = client.fetch_paper_details(paper_ids)
+        if debug:
+            typer.echo(f"Fetched Paper Details: {paper_details}")
+
+        # Step 3: Filter papers
+        filtered_papers = filter_papers(paper_details)
+        if debug:
+            typer.echo(f"Filtered Papers: {filtered_papers}")
+
+        # Step 4: Save to file or display
+        if file:
+            save_to_csv(file, filtered_papers)
+            typer.echo(f"Results saved to {file}")
+        else:
+            typer.echo(f"Results: {filtered_papers}")
+
+    except Exception as e:
+        typer.echo(f"Error occurred: {e}", err=True)
 
 if __name__ == "__main__":
     app()
+
